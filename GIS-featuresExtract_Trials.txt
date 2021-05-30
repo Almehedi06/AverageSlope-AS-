@@ -1,0 +1,195 @@
+ fields = ['OBJECTID']
+ with arcpy.da.SearchCursor(fields) as cursor:
+ for row in cursor:
+ select = 'OBJECTID = {}'.format(row[0])        
+ arcpy.SelectLayerByAttribute_management('tractsLyr','NEW_SELECTION',select)
+ 
+
+#Watersheds attribute table for all pourpoints
+PolygonLayer="RasterT_Watersh1_Select"
+#PointLayer/slope raster
+PointLayer="Points"
+fields = ['OBJECTID']
+with arcpy.da.SearchCursor(PolygonLayer, fields) as cursor: 
+   for row in cursor:
+       select = 'OBJECTID = {}'.format(row[0])        
+       arcpy.SelectLayerByAttribute_management(PolygonLayer,'NEW_SELECTION',select)
+       arcpy.SelectLayerByLocation_management(PointLayer, 'INTERSECT', PolygonLayer, 'NEW_SELECTION')
+
+
+
+#Watersheds attribute table for all pourpoints
+PolygonLayer="RasterT_Watersh1_Select"
+#PointLayer/slope raster
+PointLayer="Points"
+fields = ['OBJECTID']
+arcpy.SelectLayerByAttribute_management(PolygonLayer,'NEW_SELECTION',select)
+arcpy.SelectLayerByLocation_management(PointLayer,"INTERSECT",PolygonLayer,"","NEW_SELECTION")
+
+
+####
+###Step 3: Calculate the average and add in the main watershed table
+outStatsTable = "C:/Users/Himel/Documents/ArcGIS/Projects/MyProject/outStatsTable.shp"
+statsFields = [["MEAN"]]
+joinedField = "RASTERVALU"
+arcpy.Statistics_analysis(outPointFeatures, outStatsTable, joinedField, statsFields)
+
+#https://arcpy.wordpress.com/2012/02/01/calculate-a-mean-value-from-a-field/
+
+###
+
+
+
+
+
+##############################
+###########04/10/21###########
+
+
+from arcpy.sa import *
+arcpy.SelectLayerByAttribute_management(PolygonLayer,'NEW_SELECTION','OBJECTID=10')
+# Set local variables
+inPointFeatures = arcpy.SelectLayerByLocation_management(PointLayer,"INTERSECT",PolygonLayer,"","NEW_SELECTION")
+inRaster = "Slope_Fill_d3"
+outPointFeatures = "C:/Users/Himel/Documents/ArcGIS/Projects/MyProject/extractvaluespts.shp"
+# Execute ExtractValuesToPoints
+ExtractValuesToPoints(inPointFeatures, inRaster, outPointFeatures,
+                      "INTERPOLATE", "VALUE_ONLY")
+					  
+arcpy.DeleteFeatures_management(outPointFeatures)					  
+					  
+					  
+					  
+PolygonLayer="RasterT_Watersh1_Select"
+#PointLayer/slope raster
+PointLayer="Points"					  
+arcpy.SelectLayerByAttribute_management(PolygonLayer,'NEW_SELECTION','OBJECTID=10')
+arcpy.SelectLayerByLocation_management(PointLayer,"INTERSECT",PolygonLayer,"","NEW_SELECTION")
+
+
+###Adding new fields
+# Set local variables
+inFeatures = "RasterT_Watersh1_Select"
+fieldName1 = "Average"
+arcpy.AddField_management(inFeatures, fieldName1, "FLOAT", field_is_nullable="NULLABLE")	      
+
+
+####################################
+
+
+
+
+
+
+
+
+###########################################L A T E S T############################################
+##################################################################################################
+#Making watershed for every point
+
+from arcpy.sa import *
+
+PointLayer="Points"
+
+fields = ['OID']
+
+#Limting number of rows in the field
+exp='OID<10'
+
+# Set local variables
+inFlowDirection = "FlowDir_dem_2"
+
+with arcpy.da.SearchCursor(PointLayer, fields, exp) as cursor: 
+   for row in cursor:
+       ##Select a row of PointLayer
+       inPourPointData = 'OID = {}'.format(row[0])
+	   arcpy.SelectLayerByAttribute_management(PointLayer,'NEW_SELECTION',select)
+   
+       ##Create a temporary feature class
+       ####Temporary point layer 
+       out_path = "D:/VU/Re/DC_Data"
+       out_name = "temp-pour.shp"
+       geometry_type = "POINT"
+       template = "Points"
+       has_m = "DISABLED"
+       has_z = "DISABLED"
+       # Use Describe to get a SpatialReference object
+       spatial_ref = arcpy.Describe("D:/VU/Re/DC_Data/dem_ratertopoint.shp").spatialReference
+       # Execute CreateFeatureclass
+       arcpy.CreateFeatureclass_management(out_path, out_name, geometry_type, template, 
+                                    has_m, has_z, spatial_ref) 
+   
+       ###Copy from original point layer
+       arcpy.management.CopyFeatures(inPourPointData, out_name)
+       
+	   ###Execute Watershed
+       outWatershed = Watershed('FlowDir_Fill1', out_name)
+       
+       # Save the output 
+       inR = outWatershed.save("D:/VU/Re/DC_Data/outwtrshd02.tif")
+	   
+	   ###We need watershed polygon layer...   
+       outpoly = "D:/VU/Re/DC_Data/outwtr.shp"
+       arcpy.RasterToPolygon_conversion(outWatershed, outpoly)
+	   
+       arcpy.SelectLayerByAttribute_management(outpoly,'NEW_SELECTION')
+   
+       # Set local variables
+       inPointFeatures = arcpy.SelectLayerByLocation_management(PointLayer,"INTERSECT",outpoly,"","NEW_SELECTION")
+       inRaster = "Slope_Fill_d3"
+       outPointFeatures = "C:/Users/Himel/Documents/ArcGIS/Projects/MyProject/extractvaluespts.shp"
+
+       # Execute ExtractValuesToPoints ###Why not extracting only the rastervalue field???
+       ExtractValuesToPoints(inPointFeatures, inRaster, outPointFeatures,
+                      "INTERPOLATE", "VALUE_ONLY")
+
+
+       ###Step 3: Calculate the average and add in the main watershed table
+       na = arcpy.da.TableToNumPyArray('extractvaluespts', 'RASTERVALU')
+       mean = numpy.mean(na['RASTERVALU'])
+	   
+       arcpy.management.DeleteFeatures(out_name)
+
+       print(mean)   
+####################################################################################
+####################################################################################
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+####Temporary point layer 
+out_path = "D:/VU/Re/DC_Data"
+out_name = "temp-pour.shp"
+geometry_type = "POINT"
+template = "Points"
+has_m = "DISABLED"
+has_z = "DISABLED"
+# Use Describe to get a SpatialReference object
+spatial_ref = arcpy.Describe("D:/VU/Re/DC_Data/dem_ratertopoint.shp").spatialReference
+# Execute CreateFeatureclass
+arcpy.CreateFeatureclass_management(out_path, out_name, geometry_type, template, 
+                                    has_m, has_z, spatial_ref) 
+   
+   
+   
+
+   
+
+
+
+
+	  
